@@ -1,38 +1,64 @@
 import pickle
-from flask import Flask,request,jsonify,render_template
 import pandas as pd
-import numpy as np
-from sklearn.preprocessing import StandardScaler
+from flask import Flask, render_template, request
 
 app = Flask(__name__)
 
-## import ridge regession and standard scaler 
-ridge_model=pickle.load(open('models/ridge.pkl','rb'))
-standard_scaler=pickle.load(open('models/scaler.pkl','rb'))
+# Load model and scaler
+ridge_model = pickle.load(open("models/ridge.pkl", "rb"))
+standard_scaler = pickle.load(open("models/scaler.pkl", "rb"))
+
 
 @app.route("/")
 def index():
-    return render_template('index.html')
+    return render_template("index.html")
 
-@app.route("/predictdata",methods=['GET',"POST"])
+
+@app.route("/predictdata", methods=["GET", "POST"])
 def predict_datapoint():
-    if request.method=="POST":
-        Temprature=float(request.form.get('Temprature'))
-        RH=float(request.form.get('RH'))
-        WS=float(request.form.get('WS'))
-        Rain=float(request.form.get('Rain'))
-        FFMC=float(request.form.get('FFMC'))
-        DMC=float(request.form.get('DMC'))
-        ISI=float(request.form.get('ISI'))
-        Classes=float(request.form.get('Classes'))
-        Region=float(request.form.get('Region'))
 
-        new_data_scaled=standard_scaler.transform([[Temprature,RH,WS,Rain,FFMC,DMC,ISI,Classes,Region]])
-        result=ridge_model.predict(new_data_scaled)
+    if request.method == "POST":
+        try:
+            temperature = float(request.form["Temperature"])
+            rh = float(request.form["RH"])
+            ws = float(request.form["WS"])
+            rain = float(request.form["Rain"])
+            ffmc = float(request.form["FFMC"])
+            dmc = float(request.form["DMC"])
+            isi = float(request.form["ISI"])
+            classes = float(request.form["Classes"])
+            region = float(request.form["Region"])
 
-        return render_template("home.html", results=result[0])
-    else:
-        return render_template('home.html')
-    
+            # IMPORTANT:
+            # These column names and order must match your training data.
+            data = pd.DataFrame({
+                "Temperature": [temperature],
+                "RH": [rh],
+                "Ws": [ws],          # Use "WS" instead if your training column was "WS"
+                "Rain": [rain],
+                "FFMC": [ffmc],
+                "DMC": [dmc],
+                "ISI": [isi],
+                "Classes": [classes],
+                "Region": [region]
+            })
+
+            scaled_data = standard_scaler.transform(data)
+            prediction = ridge_model.predict(scaled_data)[0]
+
+            return render_template(
+                "home.html",
+                prediction_text=f"Predicted Fire Weather Index (FWI): {prediction:.2f}"
+            )
+
+        except Exception as e:
+            return render_template(
+                "home.html",
+                prediction_text=f"Error: {e}"
+            )
+
+    return render_template("home.html")
+
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0")
+    app.run(debug=True)
